@@ -56,13 +56,13 @@ public class JackCompiler {
 			eatHard("(");
 
 			t.mark();
-			t.advance();
 			// if next token is not closing bracket
 			if (!eat(")")) {
-				t.reset();
 				compileParameterList();
 			}
-			t.reset();
+			else{
+				t.reset();
+			}
 
 			eatHard(")");
 			compileMethodBody();
@@ -88,7 +88,6 @@ public class JackCompiler {
 		eatHard("{");
 
 		t.mark();
-		t.advance();
 
 		if (eat("var")) {
 			t.reset();
@@ -116,8 +115,7 @@ public class JackCompiler {
 	public void compileStatements() {
 
 		t.mark();
-		t.advance();
-
+		
 		if (eat("let")) {
 			t.reset();
 			compileLetStmt();
@@ -134,8 +132,6 @@ public class JackCompiler {
 			t.reset();
 			compileReturnStmt();
 		}
-
-		t.reset();
 
 	}
 
@@ -190,10 +186,15 @@ public class JackCompiler {
 	public void compileReturnStmt() {
 
 		eatHard("return");
+		t.mark();
 
 		if (!eat(";")) {
 			compileExpression();
 		}
+		else{
+			t.reset();
+		}
+		
 
 		eatHard(";");
 
