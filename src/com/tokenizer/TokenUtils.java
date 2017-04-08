@@ -1,15 +1,17 @@
 package com.tokenizer;
 
-
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class TokenUtils {
 
-	
 	private static Pattern identifierPttern = Pattern.compile("^[_a-zA-Z][_a-zA-Z0-9]{0,30}$");
 	private static Pattern stringPttern1 = Pattern.compile("^\".*\"$");
 	private static Pattern stringPttern2 = Pattern.compile("^'.*'$");
+
+	public static boolean isType(String s) {
+		return s.equals("boolean") || s.equals("int") || s.equals("float") || s.equals("char");
+	}
 
 	public static boolean isKeyword(String s) {
 		String keywords[] = TokenConstants.KEYWORDS;

@@ -45,13 +45,14 @@ public class TokenConstants {
 	public static String COMMA = ",";
 
 	public static String EQUALS = "=";
+	public static String NOT = "!";
 
 	public static String KEYWORDS[] = { "boolean", "int", "float", "class", "static", "char", "if", "for", "while",
 			"else", "elseif", "switch", "return", "void", "function", "constructor", "method", "let", "null", "this",
 			"do", "true", "false", "var" };
 
 	public static String A_OPERATOR[] = { "-", "+", "*", "/", "%" };
-	public static String L_OPERATOR[] = { "&&", "||", "==" };
+	public static String L_OPERATOR[] = { "&&", "||", "==","!=",">",">=","<","<="};
 	public static String U_OPERATOR[] = { "++", "--", "!" };
 
 }

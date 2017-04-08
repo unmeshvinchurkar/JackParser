@@ -67,12 +67,11 @@ public class Tokenizer {
 				tokens.add(new Token(TokenConstants.KEYWORD_TYPE, s, index));
 			} else if (TokenUtils.isIdentifier(s)) {
 				tokens.add(new Token(TokenConstants.IDENTIFIER_TYPE, s, index));
-			} else if(TokenUtils.isString(s)){
+			} else if (TokenUtils.isString(s)) {
 				tokens.add(new Token(TokenConstants.STRING_TYPE, s, index));
-			}
-			else{
-				
-				throw new RuntimeException("Cannot determine type of string: "+s);
+			} else {
+
+				throw new RuntimeException("Cannot determine type of string: " + s);
 			}
 		}
 
@@ -139,7 +138,17 @@ public class Tokenizer {
 			else if (ch.equals(TokenConstants.COMMA)) {
 				processCollectedChars(sb, i - sb.length());
 				tokens.add(new Token(TokenConstants.COMMA_TYPE, ch, i));
-			}		
+			}
+
+			else if (ch.equals("\n")) {
+				processCollectedChars(sb, i - sb.length());
+			}
+
+			else if (ch.equals("/")) {
+				String nextCh = text.substring(i + 1, i + 2);
+				sb.append(nextCh);
+				i++;
+			}
 
 			else if (ch.equals(TokenConstants.EQUALS)) {
 				processCollectedChars(sb, i - sb.length());
@@ -147,10 +156,23 @@ public class Tokenizer {
 				String nextCh = text.substring(i + 1, i + 2);
 
 				if (TokenUtils.isOperator(ch + nextCh)) {
-					tokens.add(new Token(TokenConstants.OPERATOR_TYPE, ch + nextCh, i + 1));
+					tokens.add(new Token(TokenConstants.OPERATOR_TYPE, getOpSubType(ch + nextCh), ch + nextCh, i + 1));
 					i++;
 				} else {
 					tokens.add(new Token(ch, ch, i));
+				}
+			}
+
+			else if (ch.equals("&") || ch.equals("|")) {
+				processCollectedChars(sb, i - sb.length());
+
+				String nextCh = text.substring(i + 1, i + 2);
+
+				if (TokenUtils.isOperator(ch + nextCh)) {
+					tokens.add(new Token(TokenConstants.OPERATOR_TYPE, getOpSubType(ch + nextCh), ch + nextCh, i + 1));
+					i++;
+				} else {
+					// tokens.add(new Token(ch, ch, i));
 				}
 			}
 
