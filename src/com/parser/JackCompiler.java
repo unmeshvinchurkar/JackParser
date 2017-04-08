@@ -5,15 +5,39 @@ import com.tokenizer.Tokenizer;
 
 public class JackCompiler {
 
-	Tokenizer t;
+	private SymbolTable cst = null;
+	private int classVarIndex = 0;
+	private static int staticIndex = 0;
+	private static int labelNameIndex = 0;
+	private String className = null;
+	private StringBuffer code = new StringBuffer(500);
+
+	private Tokenizer t;
 
 	public JackCompiler(Tokenizer t) {
 		this.t = t;
 	}
 
+	private void print(String s) {
+		code.append(s);
+		// code.append("\n");
+	}
+
+	private void printLine(String s) {
+		code.append("\n");
+		code.append(s);
+
+	}
+
 	public void compileClass() {
 
 		if (eat("class")) {
+			className = t.getToken().getValue();
+
+			cst = new SymbolTable();
+			SymbolTableManager.addSymbolTable(className, cst);
+			cst.addSymbol(new Symbol("this", className, "pointer"));
+
 			compileIdentifier(); // class name
 
 			eatHard("{");
@@ -29,13 +53,32 @@ public class JackCompiler {
 
 	public void compileClassVariables() {
 
+		String fieldType = t.getToken().getValue();
+
 		while (eat("static") || (eat("field"))) {
 
+			String kindType = fieldType.equals("field") ? "this" : "static";
+
+			String type = t.getToken().getValue();
+
 			compileType();
+
+			String varName = t.getToken().getValue();
+
 			compileIdentifier(); // variable name
 
+			String kind = kindType.equals("this") ? (kindType + " " + classVarIndex++)
+					: (kindType + " " + staticIndex++);
+
+			Symbol s = new Symbol(varName, type, kind);
+			cst.addSymbol(s);
+
 			while (eat(",")) {
+				varName = t.getToken().getValue();
 				compileIdentifier(); // variable name
+
+				s = new Symbol(varName, type, kind);
+				cst.addSymbol(s);
 			}
 
 			eatHard(";");
@@ -44,46 +87,66 @@ public class JackCompiler {
 
 	public void compileSubRoutines() {
 
+		String methodType = t.getToken().getValue();
+		boolean isConstructor = false;
+
 		while (eat("constructor") || (eat("function")) || (eat("method"))) {
 
-			if (!eat("void")) {
-				compileType();
-			} else {
-				eatHard("void");
+			if (methodType.equals("constructor")) {
+				isConstructor = true;
 			}
+
+			int numArgs = 0;
+			String returnType = "void";
+
+			if (!eat("void")) {
+				returnType = t.getToken().getValue();
+				compileType();
+			}
+
+			String methodName = t.getToken().getValue();
+
 			compileIdentifier(); // method name
+
+			SymbolTable mst = SymbolTableManager.createChildSymbolTable(className);
+
+			printLine("function " + className + "." + methodName + " ");
 
 			eatHard("(");
 
 			t.mark();
 			// if next token is not closing bracket
 			if (!eat(")")) {
-				compileParameterList();
-			}
-			else{
+				numArgs = compileParameterList(mst);
+			} else {
 				t.reset();
 			}
 
 			eatHard(")");
-			compileMethodBody();
+			compileMethodBody(mst, returnType, isConstructor);
 
 		}
 
 	}
 
-	public void compileParameterList() {
+	public int compileParameterList(SymbolTable mst) {
 
-		compileType();
-		compileIdentifier(); // parameter name
-
-		while (eat(",")) {
+		int argIndex = 0;
+		do {
+			String type = t.getToken().getValue();
 			compileType();
+			String argName = t.getToken().getValue();
 			compileIdentifier(); // parameter name
-		}
+
+			Symbol s = new Symbol(argName, type, "argument " + argIndex++);
+			mst.addSymbol(s);
+		} while (eat(","));
+
+		return argIndex;
 
 	}
 
-	public void compileMethodBody() {
+	public void compileMethodBody(SymbolTable mst, String returnType, boolean isConstructor) {
 
 		eatHard("{");
 
@@ -91,68 +154,105 @@ public class JackCompiler {
 
 		if (eat("var")) {
 			t.reset();
-			compileLocalVariables();
+			int localVarNum = compileLocalVariables(mst);
+			print(localVarNum + "");
 		}
-		compileStatements();
+		compileStatements(mst, returnType, isConstructor);
 
 		eatHard("}");
 
 	}
 
-	public void compileLocalVariables() {
+	public int compileLocalVariables(SymbolTable mst) {
 
-		eatHard("var");
-		compileType();
-		compileIdentifier(); // variable name
+		int localVar = 0;
 
-		while (eat(",")) {
-			compileIdentifier();
+		while (eat("var")) {
+			String type = t.getToken().getValue();
+			compileType();
+
+			String varName = t.getToken().getValue();
+			compileIdentifier(); // variable name
+
+			Symbol s = new Symbol(varName, type, "local " + localVar++);
+			mst.addSymbol(s);
+
+			while (eat(",")) {
+
+				varName = t.getToken().getValue();
+				compileIdentifier();
+
+				s = new Symbol(varName, type, "local " + localVar++);
+				mst.addSymbol(s);
+			}
+
+			eatHard(";");
 		}
-		eatHard(",");
 
+		return localVar;
 	}
 
-	public void compileStatements() {
+	public void compileStatements(SymbolTable mst) {
+		compileStatements(mst, null, false);
+	}
+
+	public void compileStatements(SymbolTable mst, String returnType, boolean isConstructor) {
 
 		t.mark();
-		
+
 		if (eat("let")) {
 			t.reset();
-			compileLetStmt();
+			compileLetStmt(mst);
 		} else if (eat("if")) {
 			t.reset();
-			compileIfStmt();
+			compileIfStmt(mst);
 		} else if (eat("while")) {
 			t.reset();
-			compileWhileStmt();
+			compileWhileStmt(mst);
 		} else if (eat("do")) {
 			t.reset();
 			compileDoStmt();
 		} else if (eat("return")) {
 			t.reset();
-			compileReturnStmt();
+			compileReturnStmt(mst, returnType, isConstructor);
 		}
 
 	}
 
-	public void compileWhileStmt() {
+	public void compileWhileStmt(SymbolTable mst) {
+
+		String startLabel = "whileStartLabel" + labelNameIndex++;
+		String endLabel = "whileEndLabel" + labelNameIndex++;
+
 		eatHard("while");
 		eatHard("(");
-		compileExpression();
+
+		printLine("Label: " + startLabel);
+
+		compileLogicalExp(mst);
+		printLine("not");
+
+		printLine("IF-NOT_TRUE:" + endLabel);
+
 		eatHard(")");
 		eatHard("{");
-		compileStatements();
+
+		compileStatements(mst);
 		eatHard("}");
+
+		printLine("go-to:" + startLabel);
+
+		printLine("Label: " + endLabel);
 
 	}
 
-	public void compileMethodCall() {
+	public void compileMethodCall(SymbolTable cst) {
 
 		compileIdentifier();
 
 		if (eat("(")) {
 			if (!eat(")")) {
-				compileExpressionList();
+				compileExpressionList(null);
 				eatHard(")");
 			}
 		} else if (eat(".")) {
@@ -160,7 +260,7 @@ public class JackCompiler {
 			eatHard("(");
 
 			if (!eat(")")) {
-				compileExpressionList();
+				compileExpressionList(null);
 				eatHard(")");
 			}
 		} else {
@@ -169,69 +269,281 @@ public class JackCompiler {
 
 	}
 
-	public void compileExpressionList() {
-		compileExpression();
+	public void compileExpressionList(SymbolTable mst) {
+		compileExpression(mst);
 
 		while (eat(",")) {
-			compileExpression();
+			compileExpression(mst);
 		}
 	}
 
 	public void compileDoStmt() {
 		eatHard("do");
-		compileMethodCall();
+		compileMethodCall(cst);
 		eatHard(";");
 	}
 
-	public void compileReturnStmt() {
+	public void compileReturnStmt(SymbolTable mst, String returnType, boolean isConstructor) {
 
 		eatHard("return");
 		t.mark();
 
 		if (!eat(";")) {
-			compileExpression();
-		}
-		else{
+			if (returnType != null && returnType.equals("boolean")) {
+				compileLogicalExp(mst);
+			} else {
+				compileExpression(mst);
+			}
+		} else if (isConstructor) {
+			printLine("push this");
+			t.reset();
+		} else {
+			printLine("push 0");
 			t.reset();
 		}
-		
-
 		eatHard(";");
 
 	}
 
-	public void compileLetStmt() {
+	public void compileLetStmt(SymbolTable mst) {
 
 		eatHard("let");
+
+		String name = t.getToken().getValue();
 		compileIdentifier();
 
+		String type = mst.findSymbol(name).getType();
+
 		if (eat("[")) {
-			compileExpression();
+			compileExpression(mst);
 			eatHard("]");
 		}
 
 		eatHard("=");
-		compileExpression();
+
+		if (type.equals("boolean")) {
+			compileLogicalExp(mst);
+		} else {
+			compileExpression(mst);
+		}
+
 		eatHard(";");
+		printLine("pop " + mst.findSymbol(name).getKind());
 
 	}
 
-	public void compileIfStmt() {
+	public void compileIfStmt(SymbolTable mst) {
+
+		String endLabel = "endLabel" + labelNameIndex++;
+		String elseLabel = "elseLabel" + labelNameIndex++;
 
 		eatHard("if");
 		eatHard("(");
-		compileExpression();
+		compileLogicalExp(mst);
 		eatHard(")");
 
 		eatHard("{");
-		compileStatements();
+
+		printLine("not");
+		printLine("if-not-goto:" + elseLabel);
+
+		compileStatements(mst);
 		eatHard("}");
+
+		printLine("go-to:" + endLabel);
+
+		printLine("Label:" + elseLabel);
 
 		if (eat("else")) {
 			eatHard("{");
-			compileStatements();
+			compileStatements(mst);
 			eatHard("}");
 		}
+
+		printLine("Label:" + endLabel);
+	}
+
+	public void compileLogicalExp(SymbolTable mst) {
+
+		compileLogicalTerm(mst);
+
+		if (t.hasMoreTokens()) {
+			String op = t.getToken().getValue();
+
+			if (eat("||")) {
+				compileLogicalExp(mst);
+
+				if (op.equals("||")) {
+					printLine("or");
+				}
+			}
+		}
+	}
+
+	public void compileLogicalTerm(SymbolTable mst) {
+
+		if (eat("(")) {
+			compileLogicalExp(mst);
+			eatHard(")");
+		} else {
+			compileLogicalFactor(mst);
+
+			if (t.hasMoreTokens()) {
+
+				String op = t.getToken().getValue();
+
+				if (eat("&&")) {
+					compileLogicalTerm(mst);
+
+					if (op.equals("&&")) {
+						printLine("and");
+					}
+				}
+			}
+		}
+	}
+
+	public void compileLogicalFactor(SymbolTable mst) {
+
+		if (t.getToken().getValue().equals("true") || t.getToken().getValue().equals("false")) {
+			compileLogicalFactorFactor(mst);
+		}
+
+		else {
+
+			compileExpression(mst);
+
+			String op = t.getToken().getValue();
+
+			if (eat(">=") || eat("<=") || eat("<") || eat(">")) {
+				compileExpression(mst);
+
+				if (op.equals("<")) {
+					printLine("lt");
+				} else if (op.equals(".")) {
+					printLine("gt");
+				} else if (op.equals("<=")) {
+					printLine("lte");
+				} else if (op.equals(">=")) {
+					printLine("gte");
+				}
+			}
+		}
+	}
+
+	public void compileLogicalFactorFactor(SymbolTable mst) {
+
+		if (eat("(")) {
+			compileLogicalExp(mst);
+			eat(")");
+		} else if (t.getToken().getValue().equals("true")) {
+			printLine("push 1");
+			t.advance();
+		} else if (t.getToken().getValue().equals("false")) {
+			printLine("push 0");
+			t.advance();
+		} else {
+
+			t.mark();
+			compileIdentifier();
+
+			if (eat("[")) {
+				compileExpression(mst);
+				eatHard("]");
+			} else {
+				t.reset();
+				compileMethodCall(cst);
+			}
+			/// throw new RuntimeException("Error at token: " + t.getToken());
+		}
+	}
+
+	public void compileExpression(SymbolTable mst) {
+
+		compileTerm(mst);
+
+		if (t.hasMoreTokens()) {
+			String op = t.getToken().getValue();
+
+			if (eat("+") || eat("-")) {
+				compileExpression(mst);
+
+				if (op.equals("+")) {
+					printLine("add");
+				} else {
+					printLine("sub");
+				}
+			}
+		}
+	}
+
+	public void compileTerm(SymbolTable mst) {
+
+		compileFactor(mst);
+
+		if (t.hasMoreTokens()) {
+
+			String op = t.getToken().getValue();
+
+			if (eat("*") || eat("/")) {
+				compileTerm(mst);
+
+				if (op.equals("*")) {
+					printLine("multiply");
+				} else {
+					printLine("divide");
+				}
+
+			}
+		}
+	}
+
+	public void compileFactor(SymbolTable mst) {
+		if (eat("(")) {
+			compileExpression(mst);
+			eat(")");
+		} else if (TokenUtils.isInteger(t.getToken().getValue())) {
+			printLine("push " + t.getToken().getValue());
+			t.advance();
+		} else if (TokenUtils.isNumber(t.getToken().getValue())) {
+			printLine("push " + t.getToken().getValue());
+			t.advance();
+		} else if (TokenUtils.isBoolean(t.getToken().getValue())) {
+			printLine("push " + (t.getToken().getValue().equals("true") ? "1" : "0"));
+			t.advance();
+		} else if (TokenUtils.isString(t.getToken().getValue())) {
+			printLine("push " + t.getToken().getValue());
+			t.advance();
+		} else if (TokenUtils.isUraniaryOperator(t.getToken().getValue())) {
+			String operator = t.getToken().getValue();
+
+			if (operator.equals("--")) {
+				printLine("push 1");
+				printLine("sub");
+			} else if (operator.equals("++")) {
+				printLine("push 1");
+				printLine("add");
+			} else if (operator.equals("!")) {
+				printLine("not");
+			}
+
+			t.advance();
+			compileTerm(mst);
+		} else {
+
+			t.mark();
+			compileIdentifier();
+
+			if (eat("[")) {
+				compileExpression(mst);
+				eatHard("]");
+			} else {
+				t.reset();
+				compileMethodCall(cst);
+			}
+			/// throw new RuntimeException("Error at token: " + t.getToken());
+		}
+
 	}
 
 	public void compileType() {
@@ -248,79 +560,6 @@ public class JackCompiler {
 			t.advance();
 		} else {
 			throw new RuntimeException("Not an identifier: " + t);
-		}
-
-	}
-
-	public void compileExpression() {
-
-		compileTerm();
-
-		if (t.hasMoreTokens()) {
-			String op = t.getToken().getValue();
-
-			if (eat("+") || eat("-")) {
-				compileExpression();
-
-				if (op.equals("+")) {
-					// stack.push(num1 + num2);
-				} else {
-					// stack.push(num1 - num2);
-				}
-			}
-		}
-	}
-
-	public void compileTerm() {
-
-		compileFactor();
-
-		if (t.hasMoreTokens()) {
-
-			String op = t.getToken().getValue();
-
-			if (eat("*") || eat("/")) {
-				compileTerm();
-
-				if (op.equals("*")) {
-					// stack.push(num1 * num2);
-				} else {
-					// stack.push(num1 / num2);
-				}
-
-			}
-		}
-	}
-
-	public void compileFactor() {
-		if (eat("(")) {
-			compileExpression();
-			eat(")");
-		} else if (TokenUtils.isInteger(t.getToken().getValue())) {
-			// stack.push(Float.valueOf(t.getToken().getValue()));
-			t.advance();
-		} else if (TokenUtils.isNumber(t.getToken().getValue())) {
-			t.advance();
-		} else if (TokenUtils.isBoolean(t.getToken().getValue())) {
-			t.advance();
-		} else if (TokenUtils.isString(t.getToken().getValue())) {
-			t.advance();
-		} else if (TokenUtils.isUraniaryOperator(t.getToken().getValue())) {
-			t.advance();
-			compileTerm();
-		} else {
-
-			t.mark();
-			compileIdentifier();
-
-			if (eat("[")) {
-				compileExpression();
-				eatHard("]");
-			} else {
-				t.reset();
-				compileMethodCall();
-			}
-			/// throw new RuntimeException("Error at token: " + t.getToken());
 		}
 
 	}
