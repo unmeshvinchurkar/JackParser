@@ -3,6 +3,10 @@ package com.parser;
 import com.tokenizer.TokenUtils;
 import com.tokenizer.Tokenizer;
 
+import symboltable.Symbol;
+import symboltable.SymbolTable;
+import symboltable.SymbolTableManager;
+
 public class JackCompiler {
 
 	private SymbolTable cst = null;
@@ -110,7 +114,11 @@ public class JackCompiler {
 
 			SymbolTable mst = SymbolTableManager.createChildSymbolTable(className);
 
-			printLine("function " + className + "." + methodName + " ");
+			String mName = className + "." + methodName;
+			
+			mst.setParentName(mName);
+
+			printLine("function " + mName + " ");
 
 			eatHard("(");
 
@@ -118,7 +126,9 @@ public class JackCompiler {
 			// if next token is not closing bracket
 			if (!eat(")")) {
 				numArgs = compileParameterList(mst);
+				MethodCache.setMethodArgCount(mName, numArgs);
 			} else {
+				MethodCache.setMethodArgCount(mName, 0);
 				t.reset();
 			}
 
@@ -155,6 +165,9 @@ public class JackCompiler {
 		if (eat("var")) {
 			t.reset();
 			int localVarNum = compileLocalVariables(mst);
+			
+			MethodCache.setMethodLCLCount(mst.getParentName(), localVarNum);
+			
 			print(localVarNum + "");
 		}
 		compileStatements(mst, returnType, isConstructor);

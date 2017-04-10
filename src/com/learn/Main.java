@@ -1,4 +1,4 @@
-package com.parser;
+package com.learn;
 
 import com.tokenizer.Tokenizer;
 

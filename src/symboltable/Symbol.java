@@ -1,4 +1,4 @@
-package com.parser;
+package symboltable;
 
 public class Symbol {
 

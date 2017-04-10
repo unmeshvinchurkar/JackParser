@@ -1,4 +1,4 @@
-package com.parser;
+package symboltable;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -7,6 +7,7 @@ public class SymbolTable {
 
 	private Map<String, Symbol> table = new HashMap<>();
 	private SymbolTable parentTable = null;
+	private String parentName = null;
 
 	public void setParentTable(SymbolTable st) {
 		parentTable = st;
@@ -29,6 +30,14 @@ public class SymbolTable {
 		}
 
 		return null;
+	}
+
+	public String getParentName() {
+		return parentName;
+	}
+
+	public void setParentName(String parentName) {
+		this.parentName = parentName;
 	}
 
 }
