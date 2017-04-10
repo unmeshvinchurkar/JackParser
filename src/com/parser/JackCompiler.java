@@ -42,7 +42,11 @@ public class JackCompiler {
 			SymbolTableManager.addSymbolTable(className, cst);
 			cst.addSymbol(new Symbol("this", className, "pointer"));
 
+			String className = t.getToken().getValue();
+
 			compileIdentifier(); // class name
+
+			cst.setParentName(className);
 
 			eatHard("{");
 
@@ -58,6 +62,7 @@ public class JackCompiler {
 	public void compileClassVariables() {
 
 		String fieldType = t.getToken().getValue();
+		int classVarCount = 0;
 
 		while (eat("static") || (eat("field"))) {
 
@@ -71,8 +76,14 @@ public class JackCompiler {
 
 			compileIdentifier(); // variable name
 
-			String kind = kindType.equals("this") ? (kindType + " " + classVarIndex++)
-					: (kindType + " " + staticIndex++);
+			String kind = null;
+
+			if (kindType.equals("this")) {
+				kind = kindType + " " + classVarIndex++;
+				classVarCount++;
+			} else {
+				kind = kindType + " " + staticIndex++;
+			}
 
 			Symbol s = new Symbol(varName, type, kind);
 			cst.addSymbol(s);
@@ -87,6 +98,9 @@ public class JackCompiler {
 
 			eatHard(";");
 		}
+
+		CompilerCache.setClassVarCount(cst.getParentName(), classVarCount);
+
 	}
 
 	public void compileSubRoutines() {
@@ -115,7 +129,7 @@ public class JackCompiler {
 			SymbolTable mst = SymbolTableManager.createChildSymbolTable(className);
 
 			String mName = className + "." + methodName;
-			
+
 			mst.setParentName(mName);
 
 			printLine("function " + mName + " ");
@@ -126,9 +140,9 @@ public class JackCompiler {
 			// if next token is not closing bracket
 			if (!eat(")")) {
 				numArgs = compileParameterList(mst);
-				MethodCache.setMethodArgCount(mName, numArgs);
+				CompilerCache.setMethodArgCount(mName, numArgs);
 			} else {
-				MethodCache.setMethodArgCount(mName, 0);
+				CompilerCache.setMethodArgCount(mName, 0);
 				t.reset();
 			}
 
@@ -165,9 +179,9 @@ public class JackCompiler {
 		if (eat("var")) {
 			t.reset();
 			int localVarNum = compileLocalVariables(mst);
-			
-			MethodCache.setMethodLCLCount(mst.getParentName(), localVarNum);
-			
+
+			CompilerCache.setMethodLCLCount(mst.getParentName(), localVarNum);
+
 			print(localVarNum + "");
 		}
 		compileStatements(mst, returnType, isConstructor);
