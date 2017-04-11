@@ -1,4 +1,4 @@
-package com.tokenizer;
+package com.parser.tokenizer;
 
 public class TestTokenizer {
 

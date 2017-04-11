@@ -1,6 +1,6 @@
 package com.learn;
 
-import com.tokenizer.Tokenizer;
+import com.parser.tokenizer.Tokenizer;
 
 public class Main {
 

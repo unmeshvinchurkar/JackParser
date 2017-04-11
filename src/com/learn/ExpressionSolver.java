@@ -2,8 +2,8 @@ package com.learn;
 
 import java.util.Stack;
 
-import com.tokenizer.TokenUtils;
-import com.tokenizer.Tokenizer;
+import com.parser.tokenizer.TokenUtils;
+import com.parser.tokenizer.Tokenizer;
 
 public class ExpressionSolver {
 

@@ -1,4 +1,4 @@
-package com.tokenizer;
+package com.parser.tokenizer;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

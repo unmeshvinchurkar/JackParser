@@ -1,0 +1,103 @@
+// This file is part o www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/12/Memory.jack
+
+/**
+ * Memory operations library.
+ */ 
+class Memory {
+
+    static int freeList;
+    static Array memory;
+
+    /** Initializes memory parameters. */
+    function void init() {
+        let freeList = 2048;
+        do Memory.poke(2048, 14435);
+        do Memory.poke(2049, -1);
+        return;
+    }
+
+    /** Returns the value of the main memory at the given address. */
+    function int peek(int address) {
+        return memory[address];
+    }
+
+    /** Sets the value of the main memory at this address
+     *  to the given value. */
+    function void poke(int address, int value) {
+        let memory[address] = value;
+        return;
+    }
+
+    /** finds and allocates from the heap a memory block of the 
+     *  specified size and returns a reference to its base address. */
+    function int alloc(int rsize) {
+        var int size, nextSeg, prevSeg, nextFree, unused;
+        let size = rsize + 1;
+        let nextSeg = freeList;
+        let prevSeg = -1;
+        while (Memory.peek(nextSeg) < size){
+            if (Memory.peek(nextSeg) = -1){
+                do Sys.error(6);
+                return -1;
+            }
+            let prevSeg = nextSeg;
+            let nextSeg = Memory.peek(nextSeg + 1);
+        }
+        let nextFree = Memory.peek(nextSeg + 1);
+        let unused = Memory.peek(nextSeg) - size;
+        if (unused > 1) {
+            let nextFree = nextSeg + size;
+            do Memory.poke(nextFree, unused);
+            do Memory.poke(nextFree + 1, nextSeg + 1);
+            do Memory.poke(nextSeg, size);
+        }
+
+        if (prevSeg = -1) {
+            let freeList = nextFree;
+        }
+        else {
+            do Memory.poke(prevSeg + 1, nextFree);
+        }
+        return nextSeg + 1;
+        
+    }
+
+    /** De-allocates the given object and frees its space. */
+    function void deAlloc(int object) {
+        var int seg, size, nextSeg, prevSeg;
+        let seg = object - 1;
+        let size = Memory.peek(seg);
+        let nextSeg = freeList;
+        let prevSeg = -1;
+        while (nextSeg < seg & ~(nextSeg = -1)){
+            let prevSeg = nextSeg;
+            let nextSeg = Memory.peek(nextSeg + 1);
+        }
+
+        if (seg + Memory.peek(seg) = nextSeg){
+            do Memory.poke(seg, Memory.peek(seg) + Memory.peek(nextSeg));
+            let nextSeg = Memory.peek(nextSeg + 1);
+        }
+
+        if (prevSeg = -1){
+            let freeList = seg;
+            do Memory.poke(seg+1, nextSeg);
+        }
+
+        else {
+            if ((prevSeg + memory[prevSeg]) = seg){
+                do Memory.poke(prevSeg, Memory.peek(prevSeg) + Memory.peek(seg));
+                do Memory.poke(prevSeg + 1, nextSeg);
+            }
+
+            else {
+                do Memory.poke(prevSeg + 1, seg);
+                do Memory.poke(seg + 1, nextSeg);
+            }
+        }
+        return;
+    }
+}

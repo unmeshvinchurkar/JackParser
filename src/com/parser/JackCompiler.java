@@ -1,7 +1,8 @@
 package com.parser;
 
-import com.tokenizer.TokenUtils;
-import com.tokenizer.Tokenizer;
+import com.assembler.MemoryMap;
+import com.parser.tokenizer.TokenUtils;
+import com.parser.tokenizer.Tokenizer;
 
 import symboltable.Symbol;
 import symboltable.SymbolTable;
@@ -15,6 +16,8 @@ public class JackCompiler {
 	private static int labelNameIndex = 0;
 	private String className = null;
 	private StringBuffer code = new StringBuffer(500);
+
+	private int codeLine = 0;
 
 	private Tokenizer t;
 
@@ -30,7 +33,18 @@ public class JackCompiler {
 	private void printLine(String s) {
 		code.append("\n");
 		code.append(s);
+		codeLine++;
 
+	}
+
+	private void push(String s) {
+		printLine("push " + s);
+		MemoryMap.incrementSP();
+	}
+
+	private void pop(String s) {
+		printLine("pop " + s);
+		MemoryMap.decrementSP();
 	}
 
 	public void compileClass() {
@@ -147,6 +161,14 @@ public class JackCompiler {
 			}
 
 			eatHard(")");
+
+			// If it is a constructor create object in memory
+			if (isConstructor) {
+				printLine("push " + CompilerCache.getClassVarCount(cst.getParentName()));
+				printLine("call Memory.alloc 1");
+				printLine("pop pointer 0");
+			}
+
 			compileMethodBody(mst, returnType, isConstructor);
 
 		}
@@ -306,6 +328,15 @@ public class JackCompiler {
 
 	public void compileDoStmt() {
 		eatHard("do");
+
+		String methodName = t.getToken().getValue();
+
+		printLine("push " + (codeLine + 1)); // return address
+		printLine("push " + MemoryMap.getMemorySegValue(MemoryMap.LCL));
+		printLine("push " + MemoryMap.getMemorySegValue(MemoryMap.ARG));
+		printLine("push " + MemoryMap.getMemorySegValue(MemoryMap.THIS));
+		printLine("push " + MemoryMap.getMemorySegValue(MemoryMap.THAT));
+
 		compileMethodCall(cst);
 		eatHard(";");
 	}
@@ -322,7 +353,7 @@ public class JackCompiler {
 				compileExpression(mst);
 			}
 		} else if (isConstructor) {
-			printLine("push this");
+			printLine("push pointer 0");
 			t.reset();
 		} else {
 			printLine("push 0");
