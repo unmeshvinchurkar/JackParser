@@ -162,13 +162,6 @@ public class JackCompiler {
 
 			eatHard(")");
 
-			// If it is a constructor create object in memory
-			if (isConstructor) {
-				printLine("push " + CompilerCache.getClassVarCount(cst.getParentName()));
-				printLine("call Memory.alloc 1");
-				printLine("pop pointer 0");
-			}
-
 			compileMethodBody(mst, returnType, isConstructor);
 
 		}
@@ -194,6 +187,13 @@ public class JackCompiler {
 
 	public void compileMethodBody(SymbolTable mst, String returnType, boolean isConstructor) {
 
+		// If it is a constructor create object in memory
+		if (isConstructor) {
+			printLine("push " + CompilerCache.getClassVarCount(cst.getParentName()));
+			printLine("goto Memory.alloc 1");
+			printLine("pop pointer 0");
+		}
+
 		eatHard("{");
 
 		t.mark();
@@ -207,6 +207,16 @@ public class JackCompiler {
 			print(localVarNum + "");
 		}
 		compileStatements(mst, returnType, isConstructor);
+		
+		printLine("endFrame=LCL");
+		printLine("returnAddress=*(endFrame-5)");
+		printLine("argument 0 =*(SP-1))"); // copy last value in stack to argument 0
+		printLine("SP=ARG+1");
+		printLine("THAT=*(endFrame-1)");
+		printLine("THIS=*(endFrame-2)");
+		printLine("ARG=*(endFrame-3)");
+		printLine("LCL=*(endFrame-4)");
+		printLine("goto returnAddress");
 
 		eatHard("}");
 
@@ -301,7 +311,7 @@ public class JackCompiler {
 
 		if (eat("(")) {
 			if (!eat(")")) {
-				compileExpressionList(null);
+				compileMethodExpressionList(null);
 				eatHard(")");
 			}
 		} else if (eat(".")) {
@@ -309,7 +319,7 @@ public class JackCompiler {
 			eatHard("(");
 
 			if (!eat(")")) {
-				compileExpressionList(null);
+				compileMethodExpressionList(null);
 				eatHard(")");
 			}
 		} else {
@@ -318,7 +328,13 @@ public class JackCompiler {
 
 	}
 
-	public void compileExpressionList(SymbolTable mst) {
+	/**
+	 * This method automatically pushes arguments on the stack.
+	 * 
+	 * @param mst
+	 */
+	public void compileMethodExpressionList(SymbolTable mst) {
+
 		compileExpression(mst);
 
 		while (eat(",")) {
@@ -331,13 +347,18 @@ public class JackCompiler {
 
 		String methodName = t.getToken().getValue();
 
-		printLine("push " + (codeLine + 1)); // return address
-		printLine("push " + MemoryMap.getMemorySegValue(MemoryMap.LCL));
-		printLine("push " + MemoryMap.getMemorySegValue(MemoryMap.ARG));
-		printLine("push " + MemoryMap.getMemorySegValue(MemoryMap.THIS));
-		printLine("push " + MemoryMap.getMemorySegValue(MemoryMap.THAT));
-
+		// printLine("push " + (codeLine + 1)); // return address
+		// printLine("push " + MemoryMap.getMemorySegValue(MemoryMap.LCL));
 		compileMethodCall(cst);
+
+		printLine("push RETURN_ADDRESS"); // return address
+		printLine("push LCL");
+		printLine("push ARG");
+		printLine("push  THIS");
+		printLine("push THAT");
+		printLine("ARG= SP-" + (5 - CompilerCache.getMethodArgCount(methodName)));
+		printLine("LCL=SP");
+		printLine("goto " + methodName);
 		eatHard(";");
 	}
 
